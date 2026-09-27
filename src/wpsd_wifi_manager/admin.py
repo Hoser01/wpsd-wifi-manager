@@ -345,6 +345,35 @@ INDEX_HTML = r"""<!doctype html>
     .modal-content { padding: 1rem; display: grid; gap: 0.75rem; }
     .modal-content p { margin: 0; color: var(--muted); line-height: 1.4; }
     .modal-actions { display: flex; justify-content: flex-end; gap: 0.5rem; padding: 0.75rem 1rem; border-top: 1px solid var(--line); background: var(--panel-2); }
+    .reconnect {
+      position: fixed;
+      inset: 0;
+      z-index: 30;
+      display: grid;
+      place-items: center;
+      padding: 1rem;
+      background: var(--bg);
+    }
+    .reconnect[hidden] { display: none; }
+    .reconnect-panel {
+      width: min(34rem, 100%);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 1.2rem;
+      display: grid;
+      gap: 0.8rem;
+      box-shadow: 0 1rem 2rem rgba(0,0,0,0.4);
+    }
+    .spinner {
+      width: 1.5rem;
+      height: 1.5rem;
+      border: 3px solid var(--line);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
     td input[type="number"] { width: 5.5rem; }
     @media (max-width: 1100px) {
       .workspace { grid-template-columns: 1fr; }
@@ -441,6 +470,14 @@ INDEX_HTML = r"""<!doctype html>
       </div>
     </div>
   </div>
+  <div id="reconnectOverlay" class="reconnect" hidden>
+    <div class="reconnect-panel">
+      <div class="spinner" aria-hidden="true"></div>
+      <h2 id="reconnectTitle">Connecting</h2>
+      <p class="help-text" id="reconnectMessage">NetworkManager is switching Wi-Fi networks. WPSD is not rebooting; Wi-Fi association and DHCP can take several seconds.</p>
+      <p class="help-text" id="reconnectProbe">Waiting for the admin page to respond...</p>
+    </div>
+  </div>
   <script>
     const API_BASE = window.location.pathname.startsWith("/wifi") ? "/wifi/api" : "/api";
     let modalResolver = null;
@@ -494,10 +531,51 @@ INDEX_HTML = r"""<!doctype html>
     }
     async function fetchJson(path, options) {
       const url = path.startsWith("http") ? path : apiUrl(path);
-      const response = await fetch(url, options);
+      let response;
+      try {
+        response = await fetch(url, options);
+      } catch (error) {
+        throw new Error("The request did not complete. If Wi-Fi is switching, wait for WPSD to reconnect and refresh the page.");
+      }
       const data = await response.json();
       if (!data.ok) throw new Error(data.message || "request failed");
       return data;
+    }
+    function reconnectCandidates() {
+      const paths = [window.location.origin + apiUrl("/status")];
+      if (window.location.hostname !== "wpsd.local") {
+        paths.push("http://wpsd.local/wifi/api/status");
+      }
+      return [...new Set(paths)];
+    }
+    function showReconnectOverlay(networkName) {
+      const overlay = document.getElementById("reconnectOverlay");
+      document.getElementById("reconnectTitle").textContent = `Connecting to "${networkName}"`;
+      document.getElementById("reconnectMessage").textContent = "NetworkManager is switching Wi-Fi networks. WPSD is not rebooting; Wi-Fi association and DHCP can take several seconds. This page will refresh when the admin service responds again.";
+      overlay.hidden = false;
+      pollReconnect(networkName, Date.now());
+    }
+    function hideReconnectOverlay() {
+      document.getElementById("reconnectOverlay").hidden = true;
+    }
+    async function pollReconnect(networkName, startedAt) {
+      const elapsed = Math.round((Date.now() - startedAt) / 1000);
+      document.getElementById("reconnectProbe").textContent = `Waiting for WPSD to reconnect... ${elapsed}s`;
+      for (const url of reconnectCandidates()) {
+        try {
+          const response = await fetch(url, {cache: "no-store"});
+          const data = await response.json();
+          if (data.ok && data.status && data.status.connection) {
+            document.getElementById("reconnectProbe").textContent = `Connected to ${data.status.connection}. Reloading...`;
+            const target = url.includes("wpsd.local") ? "http://wpsd.local/wifi/" : window.location.href;
+            window.setTimeout(() => { window.location.href = target; }, 900);
+            return;
+          }
+        } catch (error) {
+          // Keep waiting while NetworkManager settles or the browser route changes.
+        }
+      }
+      window.setTimeout(() => pollReconnect(networkName, startedAt), 4000);
     }
     async function refreshAll() {
       try {
@@ -581,7 +659,7 @@ INDEX_HTML = r"""<!doctype html>
         actions.className = "actions";
         const connect = document.createElement("button");
         connect.textContent = "Connect";
-        connect.onclick = () => connectNetwork(network.uuid);
+        connect.onclick = () => connectNetwork(network.uuid, network.ssid || network.name);
         actions.appendChild(connect);
         const update = document.createElement("button");
         update.textContent = "Update";
@@ -649,6 +727,7 @@ INDEX_HTML = r"""<!doctype html>
           okText: "Save & Connect"
         });
         if (!ok) return;
+        showReconnectOverlay(payload.ssid || "selected network");
       }
       showNotice(payload.connect ? "Saving profile and asking NetworkManager to connect..." : "Saving Wi-Fi profile...", true);
       try {
@@ -663,16 +742,18 @@ INDEX_HTML = r"""<!doctype html>
         refreshAll();
       } catch (error) {
         setStatus(`Save failed: ${error}`);
+        if (!String(error).includes("request did not complete")) hideReconnectOverlay();
         showNotice(`Save failed: ${error}`);
       }
     }
-    async function connectNetwork(uuid) {
+    async function connectNetwork(uuid, networkName) {
       const ok = await showDialog({
         title: "Connect Saved Profile",
         message: "NetworkManager will switch to this saved profile. WPSD will not reboot, but Wi-Fi association and DHCP can take several seconds. This browser may disconnect if the hotspot receives a new IP address.",
         okText: "Connect"
       });
       if (!ok) return;
+      showReconnectOverlay(networkName || "selected network");
       showNotice("Connection request sent to NetworkManager...", true);
       try {
         const data = await fetchJson(`/connect/${encodeURIComponent(uuid)}`, {method: "POST"});
@@ -681,6 +762,7 @@ INDEX_HTML = r"""<!doctype html>
         window.setTimeout(refreshAll, 2500);
       } catch (error) {
         setStatus(`Connect failed: ${error}`);
+        if (!String(error).includes("request did not complete")) hideReconnectOverlay();
         showNotice(`Connect failed: ${error}`);
       }
     }
