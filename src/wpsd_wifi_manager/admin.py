@@ -91,6 +91,12 @@ def _make_handler(interface: str | None, wpsd_css_path: str, log_path: str, help
                 return
             self.send_error(HTTPStatus.NOT_FOUND)
 
+        def do_OPTIONS(self) -> None:
+            self.send_response(HTTPStatus.NO_CONTENT)
+            self._send_cors_headers()
+            self.send_header("cache-control", "no-store")
+            self.end_headers()
+
         def do_POST(self) -> None:
             client = NetworkManagerClient(interface=interface, nmcli=command)
             try:
@@ -175,6 +181,7 @@ def _make_handler(interface: str | None, wpsd_css_path: str, log_path: str, help
             self.send_response(status)
             self.send_header("content-type", "application/json; charset=utf-8")
             self.send_header("cache-control", "no-store")
+            self._send_cors_headers()
             self.send_header("content-length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
@@ -187,6 +194,11 @@ def _make_handler(interface: str | None, wpsd_css_path: str, log_path: str, help
             self.send_header("content-length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
+
+        def _send_cors_headers(self) -> None:
+            self.send_header("access-control-allow-origin", "*")
+            self.send_header("access-control-allow-methods", "GET, POST, PUT, DELETE, OPTIONS")
+            self.send_header("access-control-allow-headers", "content-type")
 
         def _send_error_payload(self, exc: Exception) -> None:
             LOGGER.exception("wifi admin request failed")
@@ -479,7 +491,9 @@ INDEX_HTML = r"""<!doctype html>
     </div>
   </div>
   <script>
-    const API_BASE = window.location.pathname.startsWith("/wifi") ? "/wifi/api" : "/api";
+    const API_BASE = window.location.pathname.startsWith("/wifi")
+      ? `${window.location.protocol}//${window.location.hostname}:8093/api`
+      : "/api";
     let modalResolver = null;
     function setStatus(value) {
       if (typeof value === "string") {
@@ -542,9 +556,9 @@ INDEX_HTML = r"""<!doctype html>
       return data;
     }
     function reconnectCandidates() {
-      const paths = [window.location.origin + apiUrl("/status")];
+      const paths = [apiUrl("/status")];
       if (window.location.hostname !== "wpsd.local") {
-        paths.push("http://wpsd.local/wifi/api/status");
+        paths.push("http://wpsd.local:8093/api/status");
       }
       return [...new Set(paths)];
     }
