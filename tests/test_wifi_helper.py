@@ -53,6 +53,13 @@ from wpsd_wifi_manager.helper import validate_nmcli_args
             "device",
             "show",
         ],
+        [
+            "-t",
+            "-f",
+            "DEVICE,TYPE,STATE",
+            "device",
+            "status",
+        ],
     ],
 )
 def test_helper_allows_expected_nmcli_shapes(args: list[str]) -> None:

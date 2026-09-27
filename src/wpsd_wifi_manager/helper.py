@@ -49,6 +49,8 @@ def _matches_read_only(args: list[str]) -> bool:
         return True
     if args[:3] == ["-t", "-f", "UUID,TYPE"] and args[3:] == ["connection", "show", "--active"]:
         return True
+    if args[:3] == ["-t", "-f", "DEVICE,TYPE,STATE"] and args[3:] == ["device", "status"]:
+        return True
     if args[:4] == ["-g", "connection.autoconnect-priority,connection.autoconnect-retries,802-11-wireless.ssid", "connection", "show"]:
         return len(args) == 5 and _profile_ref(args[4])
     if args[:3] == ["-t", "-f", "GENERAL.DEVICE,GENERAL.STATE,GENERAL.CONNECTION,IP4.ADDRESS,IP4.GATEWAY"]:

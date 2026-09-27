@@ -87,6 +87,17 @@ class NetworkManagerClient:
         result = self._run(["--version"], check=False)
         return result.returncode == 0
 
+    def detect_wifi_interface(self) -> str | None:
+        result = self._nmcli(["-t", "-f", "DEVICE,TYPE,STATE", "device", "status"])
+        fallback: str | None = None
+        for row in _parse_terse_rows(result.stdout):
+            if len(row) < 3 or row[1] != "wifi" or row[0].startswith("p2p-dev-"):
+                continue
+            if row[2].lower() == "connected":
+                return row[0]
+            fallback = fallback or row[0]
+        return fallback
+
     def list_wifi_profiles(self) -> list[WifiProfile]:
         rows = self._nmcli(
             [
@@ -152,6 +163,7 @@ class NetworkManagerClient:
         self._nmcli(args, timeout=30)
 
     def status(self) -> WifiStatus:
+        interface = self.interface or self.detect_wifi_interface()
         args = [
             "-t",
             "-f",
@@ -159,8 +171,8 @@ class NetworkManagerClient:
             "device",
             "show",
         ]
-        if self.interface:
-            args.append(self.interface)
+        if interface:
+            args.append(interface)
         result = self._nmcli(args)
         values: dict[str, str] = {}
         for row in _parse_terse_rows(result.stdout):
@@ -168,7 +180,7 @@ class NetworkManagerClient:
                 values[row[0]] = row[1]
         connection = values.get("GENERAL.CONNECTION", "")
         return WifiStatus(
-            interface=values.get("GENERAL.DEVICE", self.interface or ""),
+            interface=values.get("GENERAL.DEVICE", interface or ""),
             state=values.get("GENERAL.STATE", "unknown"),
             connection=connection,
             ssid=connection,
@@ -258,10 +270,10 @@ class NetworkManagerClient:
     def disconnect(self) -> None:
         args = ["device", "disconnect"]
         if not self.interface:
-            status = self.status()
-            if not status.interface:
+            interface = self.detect_wifi_interface()
+            if not interface:
                 raise ValueError("interface is required when no active Wi-Fi device is detected")
-            args.append(status.interface)
+            args.append(interface)
         else:
             args.append(self.interface)
         self._nmcli(args, timeout=30)

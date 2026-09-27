@@ -122,6 +122,35 @@ def test_scan_marks_saved_networks() -> None:
     assert aps[0].signal == 61
 
 
+def test_status_detects_real_wifi_interface() -> None:
+    runner = FakeRunner(
+        {
+            ("nmcli", "-t", "-f", "DEVICE,TYPE,STATE", "device", "status"): completed(
+                [],
+                "lo:loopback:connected\np2p-dev-wlan0:wifi:disconnected\nwlan0:wifi:connected\n",
+            ),
+            (
+                "nmcli",
+                "-t",
+                "-f",
+                "GENERAL.DEVICE,GENERAL.STATE,GENERAL.CONNECTION,IP4.ADDRESS,IP4.GATEWAY",
+                "device",
+                "show",
+                "wlan0",
+            ): completed(
+                [],
+                "GENERAL.DEVICE:wlan0\nGENERAL.STATE:100 (connected)\nGENERAL.CONNECTION:ERIS\nIP4.ADDRESS[1]:10.10.10.66/24\nIP4.GATEWAY:10.10.10.1\n",
+            ),
+        }
+    )
+
+    status = NetworkManagerClient(runner=runner).status()
+
+    assert status.interface == "wlan0"
+    assert status.connection == "ERIS"
+    assert status.ip4_address == "10.10.10.66/24"
+
+
 def test_password_is_redacted_from_errors() -> None:
     password = "super-secret"
     runner = FakeRunner(
