@@ -557,11 +557,34 @@ INDEX_HTML = r"""<!doctype html>
       return data;
     }
     function reconnectCandidates() {
-      const paths = [apiUrl("/status")];
+      const paths = [];
       if (window.location.hostname !== "wpsd.local") {
         paths.push("http://wpsd.local:8093/api/status");
+        paths.push("http://wpsd.local/wifi/api/status");
+      }
+      paths.push(apiUrl("/status"));
+      if (window.location.hostname !== "wpsd.local") {
+        paths.push(`${window.location.protocol}//${window.location.hostname}:8093/api/status`);
       }
       return [...new Set(paths)];
+    }
+    function reconnectPageUrl(statusUrl) {
+      const url = new URL(statusUrl, window.location.href);
+      return `${url.protocol}//${url.hostname}/wifi/`;
+    }
+    async function probeReconnect(url) {
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 1800);
+      try {
+        const response = await fetch(url, {cache: "no-store", signal: controller.signal});
+        const data = await response.json();
+        if (data.ok && data.status && data.status.connection) {
+          return {url, data};
+        }
+      } finally {
+        window.clearTimeout(timeout);
+      }
+      throw new Error("WPSD is not ready yet");
     }
     function showReconnectOverlay(networkName) {
       const overlay = document.getElementById("reconnectOverlay");
@@ -576,21 +599,16 @@ INDEX_HTML = r"""<!doctype html>
     async function pollReconnect(networkName, startedAt) {
       const elapsed = Math.round((Date.now() - startedAt) / 1000);
       document.getElementById("reconnectProbe").textContent = `Waiting for WPSD to reconnect... ${elapsed}s`;
-      for (const url of reconnectCandidates()) {
-        try {
-          const response = await fetch(url, {cache: "no-store"});
-          const data = await response.json();
-          if (data.ok && data.status && data.status.connection) {
-            document.getElementById("reconnectProbe").textContent = `Connected to ${data.status.connection}. Reloading...`;
-            const target = url.includes("wpsd.local") ? "http://wpsd.local/wifi/" : window.location.href;
-            window.setTimeout(() => { window.location.href = target; }, 900);
-            return;
-          }
-        } catch (error) {
-          // Keep waiting while NetworkManager settles or the browser route changes.
-        }
+      try {
+        const result = await Promise.any(reconnectCandidates().map(probeReconnect));
+        const connectedName = result.data.status.ssid || result.data.status.connection;
+        document.getElementById("reconnectProbe").textContent = `Connected to ${connectedName}. Reloading...`;
+        window.setTimeout(() => { window.location.href = reconnectPageUrl(result.url); }, 900);
+        return;
+      } catch (error) {
+        // Keep waiting while NetworkManager settles or the browser route changes.
       }
-      window.setTimeout(() => pollReconnect(networkName, startedAt), 4000);
+      window.setTimeout(() => pollReconnect(networkName, startedAt), 2500);
     }
     async function refreshAll() {
       try {
