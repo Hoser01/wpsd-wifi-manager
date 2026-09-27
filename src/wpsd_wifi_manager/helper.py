@@ -11,7 +11,7 @@ UUID_RE = re.compile(r"^[0-9a-fA-F-]{8,}$")
 
 def main() -> int:
     nmcli_args = sys.argv[1:]
-    if nmcli_args in {["-h"], ["--help"]}:
+    if nmcli_args in (["-h"], ["--help"]):
         print("usage: wpsd-wifi-helper -- <allowed nmcli arguments>")
         return 0
     if nmcli_args[:1] == ["--"]:
