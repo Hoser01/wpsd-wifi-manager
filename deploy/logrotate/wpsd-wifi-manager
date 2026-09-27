@@ -1,0 +1,8 @@
+/opt/wpsd-wifi-manager/logs/*.log {
+    weekly
+    rotate 4
+    compress
+    missingok
+    notifempty
+    copytruncate
+}

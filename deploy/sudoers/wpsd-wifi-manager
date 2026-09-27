@@ -1,0 +1,1 @@
+pi-star ALL=(root) NOPASSWD: /opt/wpsd-wifi-manager/bin/wifi-helper *

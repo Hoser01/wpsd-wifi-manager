@@ -1,0 +1,17 @@
+[Unit]
+Description=WPSD Wi-Fi Manager Admin UI
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=pi-star
+Group=pi-star
+WorkingDirectory=/opt/wpsd-wifi-manager
+Environment=PYTHONPATH=/opt/wpsd-wifi-manager/src
+ExecStart=/usr/bin/python3 -m wpsd_wifi_manager.admin --host 0.0.0.0 --port 8093 --wpsd-css /etc/wpsd-css.ini --log-path /opt/wpsd-wifi-manager/logs/wifi-manager.log --helper-command "sudo -n /opt/wpsd-wifi-manager/bin/wifi-helper" --log-level INFO
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
