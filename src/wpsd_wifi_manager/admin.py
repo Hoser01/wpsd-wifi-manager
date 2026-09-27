@@ -308,8 +308,43 @@ INDEX_HTML = r"""<!doctype html>
     pre { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--field); padding: 0.75rem; margin: 0; max-height: 16rem; overflow-y: auto; }
     .muted { color: var(--muted); }
     .tiny { font-size: 0.75rem; }
+    .help-text { color: var(--muted); font-size: 0.76rem; line-height: 1.35; margin: 0; }
     .clickable { cursor: pointer; }
     .clickable:hover { outline: 1px solid var(--accent); }
+    .notice {
+      position: fixed;
+      right: 1rem;
+      bottom: 1rem;
+      z-index: 10;
+      max-width: min(26rem, calc(100vw - 2rem));
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-2);
+      color: var(--text);
+      padding: 0.75rem 0.9rem;
+      box-shadow: 0 0.5rem 1.5rem rgba(0,0,0,0.35);
+    }
+    .notice[hidden], .modal-backdrop[hidden] { display: none; }
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: grid;
+      place-items: center;
+      padding: 1rem;
+      background: rgba(0,0,0,0.58);
+    }
+    .modal {
+      width: min(28rem, 100%);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: 0 1rem 2rem rgba(0,0,0,0.4);
+      overflow: hidden;
+    }
+    .modal-content { padding: 1rem; display: grid; gap: 0.75rem; }
+    .modal-content p { margin: 0; color: var(--muted); line-height: 1.4; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 0.5rem; padding: 0.75rem 1rem; border-top: 1px solid var(--line); background: var(--panel-2); }
     td input[type="number"] { width: 5.5rem; }
     @media (max-width: 1100px) {
       .workspace { grid-template-columns: 1fr; }
@@ -330,7 +365,6 @@ INDEX_HTML = r"""<!doctype html>
     </div>
     <div class="actions">
       <button onclick="refreshAll()">Refresh</button>
-      <button class="primary" onclick="scan()">Scan</button>
     </div>
   </header>
   <main>
@@ -347,16 +381,16 @@ INDEX_HTML = r"""<!doctype html>
           <h2>Networks</h2>
           <div class="actions">
             <button onclick="scan()">Scan</button>
-            <button class="primary" onclick="addNetwork()">Save Profile</button>
           </div>
         </div>
         <div class="section-body network-workflow">
+          <p class="help-text">Select a scanned network to fill the SSID, or enter one manually. Higher priority wins when NetworkManager autoconnects or the watchdog chooses between visible saved networks. Changing networks does not reboot WPSD; association and DHCP can still take several seconds, and the browser may disconnect if the IP changes.</p>
           <div class="add-row">
             <label>SSID<input id="ssid" autocomplete="off"></label>
             <label>Password<input id="password" type="password" autocomplete="new-password"></label>
             <label>Priority<input id="priority" type="number" value="50"></label>
             <label><span><input id="hidden" type="checkbox"> Hidden</span></label>
-            <label><span><input id="connectNow" type="checkbox"> Connect</span></label>
+            <label><span><input id="connectNow" type="checkbox"> Save & connect</span></label>
             <button class="primary" onclick="addNetwork()">Save</button>
           </div>
           <div class="table-wrap">
@@ -373,6 +407,7 @@ INDEX_HTML = r"""<!doctype html>
           <span class="muted tiny" id="profileCount">Loading</span>
         </div>
         <div class="section-body">
+          <p class="help-text">Priority is a NetworkManager autoconnect score. Larger numbers are preferred; for example, home Wi-Fi 100, vehicle hotspot 75, phone hotspot 50. Retries of 0 means keep trying indefinitely.</p>
           <div class="table-wrap">
             <table>
               <thead><tr><th>Name</th><th>Active</th><th>Priority</th><th>Autoconnect</th><th>Retries</th><th>Actions</th></tr></thead>
@@ -390,8 +425,25 @@ INDEX_HTML = r"""<!doctype html>
       <pre id="logs">Loading log...</pre>
     </section>
   </main>
+  <div id="notice" class="notice" hidden></div>
+  <div id="modalBackdrop" class="modal-backdrop" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="section-head">
+        <h2 id="modalTitle">Confirm</h2>
+      </div>
+      <div class="modal-content">
+        <p id="modalMessage"></p>
+        <label id="modalInputWrap" hidden><span id="modalInputLabel">Value</span><input id="modalInput" type="password"></label>
+      </div>
+      <div class="modal-actions">
+        <button id="modalCancel" type="button">Cancel</button>
+        <button id="modalOk" class="primary" type="button">Continue</button>
+      </div>
+    </div>
+  </div>
   <script>
     const API_BASE = window.location.pathname.startsWith("/wifi") ? "/wifi/api" : "/api";
+    let modalResolver = null;
     function setStatus(value) {
       if (typeof value === "string") {
         renderStatusCards({message: value});
@@ -399,6 +451,44 @@ INDEX_HTML = r"""<!doctype html>
         renderStatusCards(value || {});
       }
     }
+    function showNotice(message, persist = false) {
+      const node = document.getElementById("notice");
+      node.textContent = message;
+      node.hidden = false;
+      if (!persist) {
+        window.clearTimeout(showNotice.timer);
+        showNotice.timer = window.setTimeout(() => { node.hidden = true; }, 4500);
+      }
+    }
+    function showDialog({title, message, okText = "Continue", input = false, inputLabel = "Value"}) {
+      const backdrop = document.getElementById("modalBackdrop");
+      const inputWrap = document.getElementById("modalInputWrap");
+      const inputNode = document.getElementById("modalInput");
+      document.getElementById("modalTitle").textContent = title;
+      document.getElementById("modalMessage").textContent = message;
+      document.getElementById("modalOk").textContent = okText;
+      document.getElementById("modalInputLabel").textContent = inputLabel;
+      inputWrap.hidden = !input;
+      inputNode.value = "";
+      backdrop.hidden = false;
+      if (input) inputNode.focus();
+      return new Promise((resolve) => { modalResolver = resolve; });
+    }
+    function closeDialog(value) {
+      document.getElementById("modalBackdrop").hidden = true;
+      if (modalResolver) modalResolver(value);
+      modalResolver = null;
+    }
+    document.addEventListener("click", (event) => {
+      if (event.target.id === "modalCancel") closeDialog(null);
+      if (event.target.id === "modalOk") {
+        const inputWrap = document.getElementById("modalInputWrap");
+        closeDialog(inputWrap.hidden ? true : document.getElementById("modalInput").value);
+      }
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !document.getElementById("modalBackdrop").hidden) closeDialog(null);
+    });
     function apiUrl(path) {
       return `${API_BASE}${path}`;
     }
@@ -519,6 +609,7 @@ INDEX_HTML = r"""<!doctype html>
     }
     async function scan() {
       setStatus("Scanning...");
+      showNotice("Scanning visible Wi-Fi networks with NetworkManager...", true);
       try {
         const data = await fetchJson("/scan");
         const body = document.getElementById("aps");
@@ -536,8 +627,10 @@ INDEX_HTML = r"""<!doctype html>
         });
         const status = await fetchJson("/status");
         setStatus(status.status);
+        showNotice(`Scan complete: ${(data.access_points || []).length} networks found.`);
       } catch (error) {
         setStatus(`Scan failed: ${error}`);
+        showNotice(`Scan failed: ${error}`);
       }
     }
     async function addNetwork() {
@@ -549,7 +642,15 @@ INDEX_HTML = r"""<!doctype html>
         connect: document.getElementById("connectNow").checked,
         hidden: document.getElementById("hidden").checked
       };
-      if (payload.connect && !confirm("Changing Wi-Fi networks may disconnect this browser session. Continue?")) return;
+      if (payload.connect) {
+        const ok = await showDialog({
+          title: "Save & Connect",
+          message: "NetworkManager will save this profile and try to connect. WPSD will not reboot, but association and DHCP can take several seconds. This browser may disconnect if the hotspot receives a new IP address.",
+          okText: "Save & Connect"
+        });
+        if (!ok) return;
+      }
+      showNotice(payload.connect ? "Saving profile and asking NetworkManager to connect..." : "Saving Wi-Fi profile...", true);
       try {
         const data = await fetchJson("/networks", {
           method: "POST",
@@ -558,18 +659,29 @@ INDEX_HTML = r"""<!doctype html>
         });
         document.getElementById("password").value = "";
         setStatus(data.message);
+        showNotice(payload.connect ? "Connection request sent. Waiting for NetworkManager status to update..." : data.message);
         refreshAll();
       } catch (error) {
         setStatus(`Save failed: ${error}`);
+        showNotice(`Save failed: ${error}`);
       }
     }
     async function connectNetwork(uuid) {
-      if (!confirm("Changing Wi-Fi networks may disconnect this browser session. Continue?")) return;
+      const ok = await showDialog({
+        title: "Connect Saved Profile",
+        message: "NetworkManager will switch to this saved profile. WPSD will not reboot, but Wi-Fi association and DHCP can take several seconds. This browser may disconnect if the hotspot receives a new IP address.",
+        okText: "Connect"
+      });
+      if (!ok) return;
+      showNotice("Connection request sent to NetworkManager...", true);
       try {
         const data = await fetchJson(`/connect/${encodeURIComponent(uuid)}`, {method: "POST"});
         setStatus(data.message);
+        showNotice("Connection request accepted. Watching status...");
+        window.setTimeout(refreshAll, 2500);
       } catch (error) {
         setStatus(`Connect failed: ${error}`);
+        showNotice(`Connect failed: ${error}`);
       }
     }
     async function updateNetwork(uuid, row) {
@@ -587,14 +699,23 @@ INDEX_HTML = r"""<!doctype html>
           body: JSON.stringify(payload)
         });
         setStatus(data.message);
+        showNotice(data.message);
         refreshAll();
       } catch (error) {
         setStatus(`Update failed: ${error}`);
+        showNotice(`Update failed: ${error}`);
       }
     }
     async function updatePassword(uuid) {
-      const password = prompt("Enter the new Wi-Fi password for this profile.");
+      const password = await showDialog({
+        title: "Update Password",
+        message: "The password will be stored in the NetworkManager profile. It is not saved in this application's config.",
+        okText: "Update",
+        input: true,
+        inputLabel: "New Wi-Fi password"
+      });
       if (password === null) return;
+      showNotice("Updating NetworkManager Wi-Fi secret...", true);
       try {
         const data = await fetchJson(`/networks/${encodeURIComponent(uuid)}/password`, {
           method: "POST",
@@ -602,18 +723,28 @@ INDEX_HTML = r"""<!doctype html>
           body: JSON.stringify({password})
         });
         setStatus(data.message);
+        showNotice(data.message);
       } catch (error) {
         setStatus(`Password update failed: ${error}`);
+        showNotice(`Password update failed: ${error}`);
       }
     }
     async function forgetNetwork(uuid, name) {
-      if (!confirm(`Forget saved Wi-Fi profile "${name}"?`)) return;
+      const ok = await showDialog({
+        title: "Forget Profile",
+        message: `Forget saved Wi-Fi profile "${name}"? This removes the NetworkManager profile, but does not affect other networks.`,
+        okText: "Forget"
+      });
+      if (!ok) return;
+      showNotice("Removing saved NetworkManager profile...", true);
       try {
         const data = await fetchJson(`/networks/${encodeURIComponent(uuid)}`, {method: "DELETE"});
         setStatus(data.message);
+        showNotice(data.message);
         refreshAll();
       } catch (error) {
         setStatus(`Forget failed: ${error}`);
+        showNotice(`Forget failed: ${error}`);
       }
     }
     refreshAll();
