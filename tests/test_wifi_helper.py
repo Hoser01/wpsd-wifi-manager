@@ -35,8 +35,22 @@ from wpsd_wifi_manager.helper import validate_nmcli_args
         [
             "-t",
             "-f",
-            "NAME,UUID,TYPE,DEVICE,AUTOCONNECT,802-11-wireless.ssid",
+            "NAME,UUID,TYPE,DEVICE,AUTOCONNECT",
             "connection",
+            "show",
+        ],
+        [
+            "-g",
+            "connection.autoconnect-priority,connection.autoconnect-retries,802-11-wireless.ssid",
+            "connection",
+            "show",
+            "ad1d9b97-2ef3-44d8-a028-c0d3ef625001",
+        ],
+        [
+            "-t",
+            "-f",
+            "GENERAL.DEVICE,GENERAL.STATE,GENERAL.CONNECTION,IP4.ADDRESS,IP4.GATEWAY",
+            "device",
             "show",
         ],
     ],

@@ -42,19 +42,19 @@ def validate_nmcli_args(args: list[str]) -> None:
 
 
 def _matches_read_only(args: list[str]) -> bool:
-    if args[:3] == ["-t", "-f", "NAME,UUID,TYPE,DEVICE,AUTOCONNECT,802-11-wireless.ssid"] and args[3:] == [
+    if args[:3] == ["-t", "-f", "NAME,UUID,TYPE,DEVICE,AUTOCONNECT"] and args[3:] == [
         "connection",
         "show",
     ]:
         return True
     if args[:3] == ["-t", "-f", "UUID,TYPE"] and args[3:] == ["connection", "show", "--active"]:
         return True
-    if args[:4] == ["-g", "connection.autoconnect-priority,connection.autoconnect-retries", "connection", "show"]:
+    if args[:4] == ["-g", "connection.autoconnect-priority,connection.autoconnect-retries,802-11-wireless.ssid", "connection", "show"]:
         return len(args) == 5 and _profile_ref(args[4])
-    if args[:4] == ["-t", "-f", "GENERAL.DEVICE,GENERAL.STATE,GENERAL.CONNECTION,IP4.ADDRESS,IP4.GATEWAY"]:
-        return args[4:6] == ["device", "show"] and len(args) in {6, 7}
-    if args[:4] == ["-t", "-f", "IN-USE,BSSID,SSID,CHAN,SIGNAL,SECURITY"]:
-        tail = args[4:]
+    if args[:3] == ["-t", "-f", "GENERAL.DEVICE,GENERAL.STATE,GENERAL.CONNECTION,IP4.ADDRESS,IP4.GATEWAY"]:
+        return args[3:5] == ["device", "show"] and len(args) in {5, 6}
+    if args[:3] == ["-t", "-f", "IN-USE,BSSID,SSID,CHAN,SIGNAL,SECURITY"]:
+        tail = args[3:]
         return tail == ["device", "wifi", "list"] or (
             len(tail) == 5 and tail[:3] == ["device", "wifi", "list"] and tail[3] == "ifname"
         )

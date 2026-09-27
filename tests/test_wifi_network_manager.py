@@ -41,12 +41,12 @@ def test_list_wifi_profiles_filters_wifi_and_loads_settings() -> None:
                 "nmcli",
                 "-t",
                 "-f",
-                "NAME,UUID,TYPE,DEVICE,AUTOCONNECT,802-11-wireless.ssid",
+                "NAME,UUID,TYPE,DEVICE,AUTOCONNECT",
                 "connection",
                 "show",
             ): completed(
                 [],
-                "Home Profile:u1:802-11-wireless:wlan0:yes:ERIS\nWired:u2:802-3-ethernet:eth0:yes:\n",
+                "Home Profile:u1:802-11-wireless:wlan0:yes\nWired:u2:802-3-ethernet:eth0:yes\n",
             ),
             ("nmcli", "-t", "-f", "UUID,TYPE", "connection", "show", "--active"): completed(
                 [],
@@ -55,11 +55,11 @@ def test_list_wifi_profiles_filters_wifi_and_loads_settings() -> None:
             (
                 "nmcli",
                 "-g",
-                "connection.autoconnect-priority,connection.autoconnect-retries",
+                "connection.autoconnect-priority,connection.autoconnect-retries,802-11-wireless.ssid",
                 "connection",
                 "show",
                 "u1",
-            ): completed([], "100\n0\n"),
+            ): completed([], "100\n0\nERIS\n"),
         }
     )
 
@@ -92,12 +92,12 @@ def test_scan_marks_saved_networks() -> None:
                 "nmcli",
                 "-t",
                 "-f",
-                "NAME,UUID,TYPE,DEVICE,AUTOCONNECT,802-11-wireless.ssid",
+                "NAME,UUID,TYPE,DEVICE,AUTOCONNECT",
                 "connection",
                 "show",
             ): completed(
                 [],
-                "Home Profile:u1:802-11-wireless:wlan0:yes:ERIS\n",
+                "Home Profile:u1:802-11-wireless:wlan0:yes\n",
             ),
             ("nmcli", "-t", "-f", "UUID,TYPE", "connection", "show", "--active"): completed(
                 [],
@@ -106,11 +106,11 @@ def test_scan_marks_saved_networks() -> None:
             (
                 "nmcli",
                 "-g",
-                "connection.autoconnect-priority,connection.autoconnect-retries",
+                "connection.autoconnect-priority,connection.autoconnect-retries,802-11-wireless.ssid",
                 "connection",
                 "show",
                 "u1",
-            ): completed([], "100\n0\n"),
+            ): completed([], "100\n0\nERIS\n"),
         }
     )
 

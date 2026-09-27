@@ -92,7 +92,7 @@ class NetworkManagerClient:
             [
                 "-t",
                 "-f",
-                "NAME,UUID,TYPE,DEVICE,AUTOCONNECT,802-11-wireless.ssid",
+                "NAME,UUID,TYPE,DEVICE,AUTOCONNECT",
                 "connection",
                 "show",
             ]
@@ -108,7 +108,6 @@ class NetworkManagerClient:
                 connection_type=row[2],
                 device=row[3],
                 autoconnect=_parse_bool(row[4]),
-                ssid=row[5] if len(row) >= 6 else row[0],
                 active=row[1] in active_uuids,
             )
             profiles.append(self._with_profile_settings(profile))
@@ -321,7 +320,7 @@ class NetworkManagerClient:
         result = self._run(
             [
                 "-g",
-                "connection.autoconnect-priority,connection.autoconnect-retries",
+                "connection.autoconnect-priority,connection.autoconnect-retries,802-11-wireless.ssid",
                 "connection",
                 "show",
                 profile.uuid,
@@ -337,7 +336,7 @@ class NetworkManagerClient:
             connection_type=profile.connection_type,
             device=profile.device,
             autoconnect=profile.autoconnect,
-            ssid=profile.ssid,
+            ssid=values[2] if len(values) > 2 and values[2] else profile.name,
             priority=_parse_int(values[0]) if len(values) > 0 else None,
             retries=_parse_int(values[1]) if len(values) > 1 else None,
             active=profile.active,
