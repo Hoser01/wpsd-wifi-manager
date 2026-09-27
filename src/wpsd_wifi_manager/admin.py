@@ -586,6 +586,25 @@ INDEX_HTML = r"""<!doctype html>
       }
       throw new Error("WPSD is not ready yet");
     }
+    async function firstReconnectResult(candidates) {
+      const probes = candidates.map((url) => probeReconnect(url).then(
+        (result) => ({ok: true, result}),
+        () => ({ok: false})
+      ));
+      return new Promise((resolve, reject) => {
+        let pending = probes.length;
+        probes.forEach((probe) => {
+          probe.then((outcome) => {
+            pending -= 1;
+            if (outcome.ok) {
+              resolve(outcome.result);
+              return;
+            }
+            if (pending === 0) reject(new Error("WPSD is not ready yet"));
+          });
+        });
+      });
+    }
     function showReconnectOverlay(networkName) {
       const overlay = document.getElementById("reconnectOverlay");
       document.getElementById("reconnectTitle").textContent = `Connecting to "${networkName}"`;
@@ -598,11 +617,15 @@ INDEX_HTML = r"""<!doctype html>
     }
     async function pollReconnect(networkName, startedAt) {
       const elapsed = Math.round((Date.now() - startedAt) / 1000);
-      document.getElementById("reconnectProbe").textContent = `Waiting for WPSD to reconnect... ${elapsed}s`;
+      const probe = document.getElementById("reconnectProbe");
+      probe.textContent = `Waiting for WPSD to reconnect... ${elapsed}s`;
+      if (elapsed > 30) {
+        probe.innerHTML = `Still waiting... ${elapsed}s. If this browser cannot follow the new address, open <a href="http://wpsd.local/wifi/">wpsd.local/wifi</a>.`;
+      }
       try {
-        const result = await Promise.any(reconnectCandidates().map(probeReconnect));
+        const result = await firstReconnectResult(reconnectCandidates());
         const connectedName = result.data.status.ssid || result.data.status.connection;
-        document.getElementById("reconnectProbe").textContent = `Connected to ${connectedName}. Reloading...`;
+        probe.textContent = `Connected to ${connectedName}. Reloading...`;
         window.setTimeout(() => { window.location.href = reconnectPageUrl(result.url); }, 900);
         return;
       } catch (error) {
