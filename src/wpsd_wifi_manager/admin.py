@@ -278,39 +278,55 @@ INDEX_HTML = r"""<!doctype html>
     }
     * { box-sizing: border-box; }
     body { margin: 0; background: var(--bg); color: var(--text); }
-    header, main { padding: 1rem clamp(1rem, 4vw, 2rem); }
-    header { border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 1rem; align-items: center; background: var(--banner); }
-    h1 { margin: 0; font-size: 1.1rem; }
-    h2 { margin: 0 0 0.75rem; font-size: 0.95rem; }
-    main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem); gap: 1rem; }
-    section { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); padding: 1rem; }
-    .stack { display: grid; gap: 1rem; }
-    table { width: 100%; border-collapse: collapse; min-width: 42rem; }
-    th, td { border-bottom: 1px solid var(--line); padding: 0.45rem; text-align: left; }
+    header, main { padding: 0.85rem clamp(0.75rem, 3vw, 1.4rem); }
+    header { border-bottom: 1px solid var(--line); display: grid; grid-template-columns: minmax(13rem, 1fr) auto; gap: 0.8rem; align-items: center; background: var(--banner); }
+    h1 { margin: 0; font-size: 1.05rem; }
+    h2 { margin: 0; font-size: 0.9rem; }
+    main { display: grid; gap: 0.85rem; }
+    section { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); overflow: hidden; }
+    .section-head { display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; padding: 0.65rem 0.8rem; border-bottom: 1px solid var(--line); background: var(--panel-2); }
+    .section-body { padding: 0.75rem; }
+    .workspace { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(24rem, 0.85fr); gap: 0.85rem; align-items: start; }
+    .compact-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.55rem; }
+    .stat { border: 1px solid var(--line); border-radius: 6px; background: var(--field); padding: 0.5rem 0.6rem; min-height: 3.2rem; }
+    .stat span { display: block; color: var(--muted); font-size: 0.72rem; }
+    .stat strong { display: block; margin-top: 0.2rem; font-size: 0.9rem; overflow-wrap: anywhere; }
+    .network-workflow { display: grid; gap: 0.75rem; }
+    .add-row { display: grid; grid-template-columns: minmax(9rem, 1.1fr) minmax(8rem, 1fr) 5.5rem auto auto auto; gap: 0.5rem; align-items: end; }
+    table { width: 100%; border-collapse: collapse; min-width: 40rem; }
+    th, td { border-bottom: 1px solid var(--line); padding: 0.38rem 0.45rem; text-align: left; vertical-align: middle; }
     th { color: var(--accent-2); font-size: 0.75rem; background: var(--banner); }
     tbody tr:nth-child(even) { background: var(--row-even); }
     tbody tr:nth-child(odd) { background: var(--row-odd); }
-    button, input { border: 1px solid var(--line); border-radius: 6px; background: var(--field); color: var(--text); padding: 0.5rem 0.65rem; font: inherit; }
+    button, input { border: 1px solid var(--line); border-radius: 6px; background: var(--field); color: var(--text); padding: 0.45rem 0.55rem; font: inherit; }
     button { cursor: pointer; font-weight: 700; }
     button.primary { border-color: #088a50; background: #047846; }
     button.danger { border-color: #8e2630; background: #621a22; }
-    .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .actions { display: flex; flex-wrap: wrap; gap: 0.45rem; }
     .table-wrap { overflow-x: auto; }
-    .form { display: grid; gap: 0.6rem; }
     label { display: grid; gap: 0.3rem; color: var(--muted); font-size: 0.78rem; }
-    pre { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--field); padding: 0.75rem; min-height: 7rem; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--field); padding: 0.75rem; margin: 0; max-height: 16rem; overflow-y: auto; }
     .muted { color: var(--muted); }
-    .live-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
     .tiny { font-size: 0.75rem; }
+    .clickable { cursor: pointer; }
+    .clickable:hover { outline: 1px solid var(--accent); }
     td input[type="number"] { width: 5.5rem; }
-    @media (max-width: 900px) { main { grid-template-columns: 1fr; } header { align-items: flex-start; flex-direction: column; } }
+    @media (max-width: 1100px) {
+      .workspace { grid-template-columns: 1fr; }
+      .compact-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .add-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 700px) {
+      header { grid-template-columns: 1fr; }
+      .compact-grid, .add-row { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
   <header>
     <div>
       <h1>WPSD Wi-Fi Manager</h1>
-      <div class="muted">Saved NetworkManager profiles and hotspot failover foundation</div>
+      <div class="muted">Advanced NetworkManager Wi-Fi control for WPSD</div>
     </div>
     <div class="actions">
       <button onclick="refreshAll()">Refresh</button>
@@ -318,57 +334,76 @@ INDEX_HTML = r"""<!doctype html>
     </div>
   </header>
   <main>
-    <div class="stack">
+    <section>
+      <div class="section-head">
+        <h2>Connection</h2>
+        <span class="muted tiny" id="themeState">Theme: loading</span>
+      </div>
+      <div class="section-body compact-grid" id="statusCards"></div>
+    </section>
+    <div class="workspace">
       <section>
-        <h2>Live</h2>
-        <div class="live-grid">
-          <pre id="status">Loading...</pre>
-          <pre id="logs">Loading log...</pre>
+        <div class="section-head">
+          <h2>Networks</h2>
+          <div class="actions">
+            <button onclick="scan()">Scan</button>
+            <button class="primary" onclick="addNetwork()">Save Profile</button>
+          </div>
         </div>
-        <div class="muted tiny" id="themeState">Theme: loading</div>
+        <div class="section-body network-workflow">
+          <div class="add-row">
+            <label>SSID<input id="ssid" autocomplete="off"></label>
+            <label>Password<input id="password" type="password" autocomplete="new-password"></label>
+            <label>Priority<input id="priority" type="number" value="50"></label>
+            <label><span><input id="hidden" type="checkbox"> Hidden</span></label>
+            <label><span><input id="connectNow" type="checkbox"> Connect</span></label>
+            <button class="primary" onclick="addNetwork()">Save</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>SSID</th><th>Signal</th><th>Channel</th><th>Security</th><th>Saved</th></tr></thead>
+              <tbody id="aps"></tbody>
+            </table>
+          </div>
+        </div>
       </section>
       <section>
-        <h2>Saved Networks</h2>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Name</th><th>Active</th><th>Priority</th><th>Autoconnect</th><th>Retries</th><th>Actions</th></tr></thead>
-            <tbody id="networks"></tbody>
-          </table>
+        <div class="section-head">
+          <h2>Saved Profiles</h2>
+          <span class="muted tiny" id="profileCount">Loading</span>
         </div>
-      </section>
-      <section>
-        <h2>Visible Networks</h2>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>SSID</th><th>Signal</th><th>Channel</th><th>Security</th><th>Saved</th></tr></thead>
-            <tbody id="aps"></tbody>
-          </table>
+        <div class="section-body">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Name</th><th>Active</th><th>Priority</th><th>Autoconnect</th><th>Retries</th><th>Actions</th></tr></thead>
+              <tbody id="networks"></tbody>
+            </table>
+          </div>
         </div>
       </section>
     </div>
-    <div class="stack">
-      <section>
-        <h2>Add Network</h2>
-        <div class="form">
-          <label>SSID<input id="ssid"></label>
-          <label>Password<input id="password" type="password"></label>
-          <label>Priority<input id="priority" type="number" value="50"></label>
-          <label><span><input id="hidden" type="checkbox"> Hidden network</span></label>
-          <label><span><input id="connectNow" type="checkbox"> Save & Connect</span></label>
-          <button class="primary" onclick="addNetwork()">Save Profile</button>
-        </div>
-      </section>
-      <section>
-        <h2>Feature Coverage</h2>
-        <ul id="features" class="muted"></ul>
-      </section>
-    </div>
+    <section>
+      <div class="section-head">
+        <h2>Event Log</h2>
+        <span class="muted tiny">Daily rotation, 3 days retained</span>
+      </div>
+      <pre id="logs">Loading log...</pre>
+    </section>
   </main>
   <script>
+    const API_BASE = window.location.pathname.startsWith("/wifi") ? "/wifi/api" : "/api";
     function setStatus(value) {
-      document.getElementById("status").textContent = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+      if (typeof value === "string") {
+        renderStatusCards({message: value});
+      } else {
+        renderStatusCards(value || {});
+      }
     }
-    async function fetchJson(url, options) {
+    function apiUrl(path) {
+      return `${API_BASE}${path}`;
+    }
+    async function fetchJson(path, options) {
+      const url = path.startsWith("http") ? path : apiUrl(path);
       const response = await fetch(url, options);
       const data = await response.json();
       if (!data.ok) throw new Error(data.message || "request failed");
@@ -377,18 +412,17 @@ INDEX_HTML = r"""<!doctype html>
     async function refreshAll() {
       try {
         await loadTheme();
-        const status = await fetchJson("/api/status");
+        const status = await fetchJson("/status");
         setStatus(status.status);
         await refreshLogs();
-        await loadFeatures();
-        const networks = await fetchJson("/api/networks");
+        const networks = await fetchJson("/networks");
         renderNetworks(networks.networks || []);
       } catch (error) {
         setStatus(`Refresh failed: ${error}`);
       }
     }
     async function loadTheme() {
-      const data = await fetchJson("/api/theme");
+      const data = await fetchJson("/theme");
       const theme = data.theme || {};
       Object.entries(theme.variables || {}).forEach(([key, value]) => {
         if (key.startsWith("--") && /^#[0-9a-fA-F]{6}$/.test(value)) {
@@ -398,24 +432,36 @@ INDEX_HTML = r"""<!doctype html>
       document.getElementById("themeState").textContent = theme.source === "wpsd" ? `Theme: WPSD (${theme.path})` : "Theme: fallback";
     }
     async function refreshLogs() {
-      const data = await fetchJson("/api/logs");
+      const data = await fetchJson("/logs");
       const log = data.log || {};
       const lines = log.exists ? log.lines || [] : [`No log yet at ${log.path || ""}`];
       document.getElementById("logs").textContent = lines.join("\n");
     }
-    async function loadFeatures() {
-      const data = await fetchJson("/api/features");
-      const list = document.getElementById("features");
-      list.innerHTML = "";
-      (data.features || []).forEach((feature) => {
-        const item = document.createElement("li");
-        item.textContent = feature;
-        list.appendChild(item);
+    function renderStatusCards(status) {
+      const node = document.getElementById("statusCards");
+      node.innerHTML = "";
+      const cards = [
+        ["Interface", status.interface || ""],
+        ["State", status.state || status.message || ""],
+        ["Connected To", status.connection || status.ssid || ""],
+        ["IP / Gateway", [status.ip4_address, status.gateway].filter(Boolean).join(" / ")]
+      ];
+      cards.forEach(([label, value]) => {
+        const card = document.createElement("div");
+        card.className = "stat";
+        const caption = document.createElement("span");
+        caption.textContent = label;
+        const text = document.createElement("strong");
+        text.textContent = value || "N/A";
+        card.appendChild(caption);
+        card.appendChild(text);
+        node.appendChild(card);
       });
     }
     function renderNetworks(networks) {
       const body = document.getElementById("networks");
       body.innerHTML = "";
+      document.getElementById("profileCount").textContent = `${networks.length} saved`;
       networks.forEach((network) => {
         const row = document.createElement("tr");
         appendCell(row, network.name);
@@ -474,11 +520,12 @@ INDEX_HTML = r"""<!doctype html>
     async function scan() {
       setStatus("Scanning...");
       try {
-        const data = await fetchJson("/api/scan");
+        const data = await fetchJson("/scan");
         const body = document.getElementById("aps");
         body.innerHTML = "";
         (data.access_points || []).forEach((ap) => {
           const row = document.createElement("tr");
+          row.className = "clickable";
           appendCell(row, ap.ssid);
           appendCell(row, ap.signal ?? "");
           appendCell(row, ap.channel ?? "");
@@ -487,7 +534,8 @@ INDEX_HTML = r"""<!doctype html>
           row.onclick = () => { document.getElementById("ssid").value = ap.ssid; };
           body.appendChild(row);
         });
-        setStatus(`Found ${(data.access_points || []).length} access points.`);
+        const status = await fetchJson("/status");
+        setStatus(status.status);
       } catch (error) {
         setStatus(`Scan failed: ${error}`);
       }
@@ -503,7 +551,7 @@ INDEX_HTML = r"""<!doctype html>
       };
       if (payload.connect && !confirm("Changing Wi-Fi networks may disconnect this browser session. Continue?")) return;
       try {
-        const data = await fetchJson("/api/networks", {
+        const data = await fetchJson("/networks", {
           method: "POST",
           headers: {"content-type": "application/json"},
           body: JSON.stringify(payload)
@@ -518,7 +566,7 @@ INDEX_HTML = r"""<!doctype html>
     async function connectNetwork(uuid) {
       if (!confirm("Changing Wi-Fi networks may disconnect this browser session. Continue?")) return;
       try {
-        const data = await fetchJson(`/api/connect/${encodeURIComponent(uuid)}`, {method: "POST"});
+        const data = await fetchJson(`/connect/${encodeURIComponent(uuid)}`, {method: "POST"});
         setStatus(data.message);
       } catch (error) {
         setStatus(`Connect failed: ${error}`);
@@ -533,7 +581,7 @@ INDEX_HTML = r"""<!doctype html>
       if (priorityValue !== "") payload.priority = Number(priorityValue);
       if (retriesValue !== "") payload.retries = Number(retriesValue);
       try {
-        const data = await fetchJson(`/api/networks/${encodeURIComponent(uuid)}`, {
+        const data = await fetchJson(`/networks/${encodeURIComponent(uuid)}`, {
           method: "PUT",
           headers: {"content-type": "application/json"},
           body: JSON.stringify(payload)
@@ -548,7 +596,7 @@ INDEX_HTML = r"""<!doctype html>
       const password = prompt("Enter the new Wi-Fi password for this profile.");
       if (password === null) return;
       try {
-        const data = await fetchJson(`/api/networks/${encodeURIComponent(uuid)}/password`, {
+        const data = await fetchJson(`/networks/${encodeURIComponent(uuid)}/password`, {
           method: "POST",
           headers: {"content-type": "application/json"},
           body: JSON.stringify({password})
@@ -561,7 +609,7 @@ INDEX_HTML = r"""<!doctype html>
     async function forgetNetwork(uuid, name) {
       if (!confirm(`Forget saved Wi-Fi profile "${name}"?`)) return;
       try {
-        const data = await fetchJson(`/api/networks/${encodeURIComponent(uuid)}`, {method: "DELETE"});
+        const data = await fetchJson(`/networks/${encodeURIComponent(uuid)}`, {method: "DELETE"});
         setStatus(data.message);
         refreshAll();
       } catch (error) {
@@ -571,7 +619,7 @@ INDEX_HTML = r"""<!doctype html>
     refreshAll();
     setInterval(async () => {
       try {
-        const status = await fetchJson("/api/status");
+        const status = await fetchJson("/status");
         setStatus(status.status);
         await refreshLogs();
       } catch (error) {

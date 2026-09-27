@@ -57,6 +57,17 @@ install -m 0644 "${SOURCE_ROOT}/deploy/systemd/${WATCHDOG_SERVICE_NAME}" "/etc/s
 install -m 0440 "${SOURCE_ROOT}/deploy/sudoers/wpsd-wifi-manager" "/etc/sudoers.d/wpsd-wifi-manager"
 install -m 0644 "${SOURCE_ROOT}/deploy/logrotate/wpsd-wifi-manager" "/etc/logrotate.d/wpsd-wifi-manager"
 
+if [[ -d /etc/nginx/default.d && -f "${SOURCE_ROOT}/deploy/nginx/wpsd-wifi-manager.conf" ]]; then
+  install -m 0644 "${SOURCE_ROOT}/deploy/nginx/wpsd-wifi-manager.conf" "/etc/nginx/default.d/wpsd-wifi-manager.conf"
+  if command -v nginx >/dev/null 2>&1 && nginx -t; then
+    systemctl reload nginx || systemctl restart nginx || true
+  elif [[ -x /usr/sbin/nginx ]] && /usr/sbin/nginx -t; then
+    systemctl reload nginx || systemctl restart nginx || true
+  else
+    echo "Installed nginx /wifi route, but nginx config test was not available or did not pass." >&2
+  fi
+fi
+
 if command -v visudo >/dev/null 2>&1; then
   visudo -cf "/etc/sudoers.d/wpsd-wifi-manager"
 fi
@@ -72,6 +83,7 @@ echo "Installed WPSD Wi-Fi Manager."
 echo
 echo "Admin UI:"
 echo "  http://<hotspot-hostname-or-ip>:8093/"
+echo "  http://<hotspot-hostname-or-ip>/wifi/"
 echo
 echo "Services:"
 echo "  sudo systemctl status ${ADMIN_SERVICE_NAME}"

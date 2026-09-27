@@ -13,6 +13,12 @@ It follows the same deployment style as `ysf-bm-router`:
 Default admin URL:
 
 ```text
+http://wpsd.local/wifi/
+```
+
+Direct service URL:
+
+```text
 http://wpsd.local:8093/
 ```
 
@@ -35,6 +41,7 @@ The current slice includes:
 - A watchdog service with progressive failure counting, rescans, and highest-priority saved-network recovery.
 - An installer for `/opt/wpsd-wifi-manager`.
 - Log rotation.
+- WPSD nginx route at `/wifi/`.
 - A clean uninstaller that preserves NetworkManager Wi-Fi profiles by default.
 
 Install on WPSD with:

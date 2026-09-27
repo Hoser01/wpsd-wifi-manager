@@ -18,7 +18,13 @@ rm -f "/etc/systemd/system/${ADMIN_SERVICE_NAME}"
 rm -f "/etc/systemd/system/${WATCHDOG_SERVICE_NAME}"
 rm -f "/etc/sudoers.d/wpsd-wifi-manager"
 rm -f "/etc/logrotate.d/wpsd-wifi-manager"
+rm -f "/etc/nginx/default.d/wpsd-wifi-manager.conf"
 systemctl daemon-reload
+if command -v nginx >/dev/null 2>&1 && nginx -t; then
+  systemctl reload nginx || true
+elif [[ -x /usr/sbin/nginx ]] && /usr/sbin/nginx -t; then
+  systemctl reload nginx || true
+fi
 
 rm -rf "${APP_DIR}"
 

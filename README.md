@@ -30,8 +30,10 @@ sudo ./scripts/install-wifi-manager.sh
 Default admin URL:
 
 ```text
-http://wpsd.local:8093/
+http://wpsd.local/wifi/
 ```
+
+The service also listens directly on `http://wpsd.local:8093/`.
 
 Service checks:
 
