@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import argparse
 import re
 import subprocess
 import sys
@@ -11,13 +10,10 @@ UUID_RE = re.compile(r"^[0-9a-fA-F-]{8,}$")
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        prog="wpsd-wifi-helper",
-        description="Restricted privileged helper for WPSD Wi-Fi manager NetworkManager operations.",
-    )
-    parser.add_argument("nmcli_args", nargs=argparse.REMAINDER)
-    args = parser.parse_args()
-    nmcli_args = args.nmcli_args
+    nmcli_args = sys.argv[1:]
+    if nmcli_args in {["-h"], ["--help"]}:
+        print("usage: wpsd-wifi-helper -- <allowed nmcli arguments>")
+        return 0
     if nmcli_args[:1] == ["--"]:
         nmcli_args = nmcli_args[1:]
     validate_nmcli_args(nmcli_args)
