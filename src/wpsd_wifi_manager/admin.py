@@ -310,7 +310,7 @@ INDEX_HTML = r"""<!doctype html>
     th { color: var(--accent-2); font-size: 0.75rem; background: var(--banner); }
     tbody tr:nth-child(even) { background: var(--row-even); }
     tbody tr:nth-child(odd) { background: var(--row-odd); }
-    button, input { border: 1px solid var(--line); border-radius: 6px; background: var(--field); color: var(--text); padding: 0.45rem 0.55rem; font: inherit; }
+    button, input, select { border: 1px solid var(--line); border-radius: 6px; background: var(--field); color: var(--text); padding: 0.45rem 0.55rem; font: inherit; }
     button { cursor: pointer; font-weight: 700; }
     button.primary { border-color: #088a50; background: #047846; }
     button.danger { border-color: #8e2630; background: #621a22; }
@@ -387,6 +387,7 @@ INDEX_HTML = r"""<!doctype html>
     }
     @keyframes spin { to { transform: rotate(360deg); } }
     td input[type="number"] { width: 5.5rem; }
+    td select[data-field="retryMode"] { width: 7rem; margin-right: 0.35rem; }
     @media (max-width: 1100px) {
       .workspace { grid-template-columns: 1fr; }
       .compact-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -448,7 +449,7 @@ INDEX_HTML = r"""<!doctype html>
           <span class="muted tiny" id="profileCount">Loading</span>
         </div>
         <div class="section-body">
-          <p class="help-text">Priority is a NetworkManager autoconnect score. Larger numbers are preferred; for example, home Wi-Fi 100, vehicle hotspot 75, phone hotspot 50. Retries of 0 means keep trying indefinitely.</p>
+          <p class="help-text">Priority is a NetworkManager autoconnect score. Larger numbers are preferred; for example, home Wi-Fi 100, vehicle hotspot 75, phone hotspot 50. Retries: Default uses NetworkManager's normal behavior, Forever keeps trying, and Custom tries the number you enter.</p>
           <div class="table-wrap">
             <table>
               <thead><tr><th>Name</th><th>Active</th><th>Priority</th><th>Autoconnect</th><th>Retries</th><th>Actions</th></tr></thead>
@@ -663,10 +664,30 @@ INDEX_HTML = r"""<!doctype html>
         autoconnectCell.appendChild(autoconnect);
         row.appendChild(autoconnectCell);
         const retriesCell = document.createElement("td");
+        const retryMode = document.createElement("select");
+        retryMode.dataset.field = "retryMode";
+        [
+          ["default", "Default"],
+          ["forever", "Forever"],
+          ["custom", "Custom"]
+        ].forEach(([value, label]) => {
+          const option = document.createElement("option");
+          option.value = value;
+          option.textContent = label;
+          retryMode.appendChild(option);
+        });
         const retries = document.createElement("input");
         retries.type = "number";
-        retries.value = network.retries ?? "";
+        retries.min = "1";
         retries.dataset.field = "retries";
+        retries.value = network.retries && network.retries > 0 ? network.retries : "";
+        retryMode.value = retryModeFromValue(network.retries);
+        retries.hidden = retryMode.value !== "custom";
+        retryMode.onchange = () => {
+          retries.hidden = retryMode.value !== "custom";
+          if (retryMode.value === "custom" && !retries.value) retries.value = "3";
+        };
+        retriesCell.appendChild(retryMode);
         retriesCell.appendChild(retries);
         row.appendChild(retriesCell);
         const actions = document.createElement("td");
@@ -698,6 +719,11 @@ INDEX_HTML = r"""<!doctype html>
       cell.textContent = value ?? "";
       row.appendChild(cell);
       return cell;
+    }
+    function retryModeFromValue(value) {
+      if (value === 0) return "forever";
+      if (value && value > 0) return "custom";
+      return "default";
     }
     async function scan() {
       setStatus("Scanning...");
@@ -782,12 +808,15 @@ INDEX_HTML = r"""<!doctype html>
     }
     async function updateNetwork(uuid, row) {
       const priorityValue = row.querySelector('input[data-field="priority"]').value;
+      const retryMode = row.querySelector('select[data-field="retryMode"]').value;
       const retriesValue = row.querySelector('input[data-field="retries"]').value;
       const payload = {
         autoconnect: row.querySelector('input[data-field="autoconnect"]').checked
       };
       if (priorityValue !== "") payload.priority = Number(priorityValue);
-      if (retriesValue !== "") payload.retries = Number(retriesValue);
+      if (retryMode === "default") payload.retries = -1;
+      if (retryMode === "forever") payload.retries = 0;
+      if (retryMode === "custom") payload.retries = Number(retriesValue || 3);
       try {
         const data = await fetchJson(`/networks/${encodeURIComponent(uuid)}`, {
           method: "PUT",
